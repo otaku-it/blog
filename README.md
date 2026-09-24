@@ -27,6 +27,18 @@ BLOG_PORT=9000 docker compose up -d --build
 
 Docker Compose 只启动前端和后端，不创建新的 MySQL 容器。后端通过 `.env` 中的 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_DATABASE`、`MYSQL_USER` 和 `MYSQL_PASSWORD` 连接已有 MySQL；如果 MySQL 就运行在 Docker 宿主机，默认的 `host.docker.internal` 可以直接使用。首次连接目标库时，后端会自动执行 Alembic 数据库迁移，并在完全空的业务表中写入初始化数据。
 
+云服务器现有 MySQL 使用宿主机端口时，配置示例：
+
+```env
+MYSQL_HOST=host.docker.internal
+MYSQL_PORT=3308
+MYSQL_DATABASE=blog
+MYSQL_USER=root
+MYSQL_PASSWORD=实际密码
+```
+
+后端启动时会先等待现有 MySQL 可用；如果配置的业务数据库不存在，会在这个已有 MySQL 实例内执行 `CREATE DATABASE IF NOT EXISTS`，随后通过 Alembic 创建或升级数据表。它不会启动新的 MySQL 容器，也不会删除已有数据库或表。日志会显示连接的主机、端口和数据库名，但不会打印数据库密码。
+
 数据库结构以 Alembic 迁移为准：
 
 - 初始表结构：[backend/alembic/versions/0001_initial.py](backend/alembic/versions/0001_initial.py)
