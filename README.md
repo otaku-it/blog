@@ -4,7 +4,7 @@
 
 - 前端：Vue 3、Vue Router、Vite、Tailwind CSS
 - 后端：Python、FastAPI、SQLAlchemy、Alembic
-- 数据库：MySQL 8.4（utf8mb4）
+- 数据库：已有 MySQL 8.x（utf8mb4），Docker Compose 不再创建 MySQL 容器
 - 部署：Docker Compose、Nginx
 - API：文章分页/筛选/搜索、草稿发布、标签分类、评论、健康检查
 - 权限：管理员登录后才能进入内容后台、保存草稿或发布文章
@@ -13,7 +13,7 @@
 
 ```bash
 cp .env.example .env
-# 必须修改 .env 中的数据库密码、ADMIN_PASSWORD 和 AUTH_SECRET
+# 配置现有 MySQL 的地址、数据库名和账号密码，并修改 ADMIN_PASSWORD、AUTH_SECRET
 docker compose up -d --build
 ```
 
@@ -25,7 +25,21 @@ docker compose up -d --build
 BLOG_PORT=9000 docker compose up -d --build
 ```
 
-首次启动时，后端会等待 MySQL 健康检查通过，自动执行 Alembic 数据库迁移，并在空库中写入初始文章和评论。MySQL 数据保存在 `mysql_data` Docker volume 中，因此普通重启或 `docker compose down` 不会清空内容。
+Docker Compose 只启动前端和后端，不创建新的 MySQL 容器。后端通过 `.env` 中的 `MYSQL_HOST`、`MYSQL_PORT`、`MYSQL_DATABASE`、`MYSQL_USER` 和 `MYSQL_PASSWORD` 连接已有 MySQL；如果 MySQL 就运行在 Docker 宿主机，默认的 `host.docker.internal` 可以直接使用。首次连接目标库时，后端会自动执行 Alembic 数据库迁移，并在完全空的业务表中写入初始化数据。
+
+数据库结构以 Alembic 迁移为准：
+
+- 初始表结构：[backend/alembic/versions/0001_initial.py](backend/alembic/versions/0001_initial.py)
+- 管理员和站点资料：[backend/alembic/versions/0002_admin_profile.py](backend/alembic/versions/0002_admin_profile.py)
+- 后续字段升级：`backend/alembic/versions/0003_*.py` 至 `0007_*.py`
+- 完整 MySQL 8 建表参考脚本：[backend/sql/schema.sql](backend/sql/schema.sql)
+
+已有数据库推荐直接执行迁移，不要重复运行完整建表脚本：
+
+```bash
+cd backend
+DATABASE_URL='mysql+pymysql://用户名:密码@主机:3306/数据库名?charset=utf8mb4' .venv/bin/alembic upgrade head
+```
 
 管理员登录页不在公共导航中展示，需要直接访问 `/admin/login`。管理员账号由 `.env` 中的 `ADMIN_USERNAME` 和 `ADMIN_PASSWORD` 初始化，默认账号名为 `baize`；首次初始化后可在“后台 → 站点设置 → 登录密码”中修改密码。未登录用户不能创建、修改或读取草稿，公开页面只能看到已发布文章。
 
@@ -35,7 +49,7 @@ BLOG_PORT=9000 docker compose up -d --build
 
 ```bash
 docker compose ps
-docker compose logs -f backend mysql
+docker compose logs -f backend frontend
 ```
 
 停止服务但保留数据：
@@ -44,7 +58,7 @@ docker compose logs -f backend mysql
 docker compose down
 ```
 
-只有在明确需要重新初始化数据库时才执行 `docker compose down -v`；这会删除 `mysql_data` 中的全部文章、草稿和评论。
+`docker compose down` 或 `docker compose down -v` 都不会删除外部 MySQL 数据；`-v` 只会删除本项目的上传资源卷，请谨慎使用。
 
 ## 本地开发
 
@@ -58,7 +72,7 @@ pip install -r requirements-dev.txt
 uvicorn app.main:app --reload
 ```
 
-本地开发默认使用 `sqlite:///./blog.db`，便于运行测试；生产/Compose 环境通过 `DATABASE_URL` 使用 MySQL。若要本地连接 MySQL，可先启动 Compose 的 mysql 服务，再导出与 `.env` 一致的连接串。
+本地开发默认使用 `sqlite:///./blog.db`，便于运行测试；生产/Compose 环境通过 `DATABASE_URL` 使用已有 MySQL。需要本地连接 MySQL 时，导出对应连接串即可。
 
 前端：
 
