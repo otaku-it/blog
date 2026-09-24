@@ -31,7 +31,7 @@ Docker Compose 只启动前端和后端，不创建新的 MySQL 容器。后端�
 
 ```env
 MYSQL_HOST=host.docker.internal
-MYSQL_PORT=3308
+MYSQL_PORT=3306
 MYSQL_DATABASE=blog
 MYSQL_USER=root
 MYSQL_PASSWORD=实际密码

@@ -14,7 +14,7 @@ def ensure_mysql_database() -> None:
         raise RuntimeError("MYSQL_DATABASE is invalid")
     connection = pymysql.connect(
         host=os.getenv("MYSQL_HOST", "host.docker.internal"),
-        port=int(os.getenv("MYSQL_PORT", "3308")),
+        port=int(os.getenv("MYSQL_PORT", "3306")),
         user=os.getenv("MYSQL_USER", "root"),
         password=os.getenv("MYSQL_PASSWORD", ""),
         connect_timeout=5,
@@ -24,7 +24,8 @@ def ensure_mysql_database() -> None:
         with connection.cursor() as cursor:
             cursor.execute(
                 f"CREATE DATABASE IF NOT EXISTS `{database}` "
-                "CHARACTER SET utf8mb4 COLLATE utf8mb4_0900_ai_ci"
+                # utf8mb4_unicode_ci 同时兼容 MySQL 5.7/8 和 MariaDB。
+                "CHARACTER SET utf8mb4 COLLATE utf8mb4_unicode_ci"
             )
         connection.commit()
     finally:
@@ -36,7 +37,7 @@ def database_url() -> tuple[str, bool]:
     if configured:
         return configured, False
     host = os.getenv("MYSQL_HOST", "host.docker.internal")
-    port = os.getenv("MYSQL_PORT", "3308")
+    port = os.getenv("MYSQL_PORT", "3306")
     database = os.getenv("MYSQL_DATABASE", "blog")
     user = quote_plus(os.getenv("MYSQL_USER", "root"))
     password = quote_plus(os.getenv("MYSQL_PASSWORD", ""))
@@ -52,12 +53,21 @@ interval = max(1, int(os.getenv("DB_CONNECT_INTERVAL", "2")))
 
 for attempt in range(1, retries + 1):
     try:
-        if manages_database:
-            ensure_mysql_database()
         engine = create_engine(url, pool_pre_ping=True)
-        with engine.connect() as connection:
-            connection.execute(text("SELECT 1"))
-        engine.dispose()
+        try:
+            with engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+        except Exception:
+            # 已存在的业务库无需 CREATE DATABASE 权限；仅在直连失败时尝试补建。
+            if not manages_database:
+                raise
+            engine.dispose()
+            ensure_mysql_database()
+            engine = create_engine(url, pool_pre_ping=True)
+            with engine.connect() as connection:
+                connection.execute(text("SELECT 1"))
+        finally:
+            engine.dispose()
         print(f"Database connected: {safe_target}", flush=True)
         break
     except Exception as exc:

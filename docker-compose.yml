@@ -24,7 +24,8 @@ services:
     environment:
       # 云服务器已有 MySQL 通过宿主机映射端口访问；不依赖 Compose 内的 mysql 服务名。
       MYSQL_HOST: ${MYSQL_HOST:-host.docker.internal}
-      MYSQL_PORT: ${MYSQL_PORT:-3308}
+      # 云服务器上的 MySQL 默认使用 3306；本地若映射为 3308，请在 .env 覆盖。
+      MYSQL_PORT: ${MYSQL_PORT:-3306}
       MYSQL_DATABASE: ${MYSQL_DATABASE:-blog}
       MYSQL_USER: ${MYSQL_USER:-root}
       MYSQL_PASSWORD: ${MYSQL_PASSWORD:-root-lightship}

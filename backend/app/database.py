@@ -9,7 +9,7 @@ def get_database_url():
     if os.getenv("MYSQL_HOST"):
         from urllib.parse import quote_plus
         host = os.getenv("MYSQL_HOST", "host.docker.internal")
-        port = os.getenv("MYSQL_PORT", "3308")
+        port = os.getenv("MYSQL_PORT", "3306")
         database = os.getenv("MYSQL_DATABASE", "blog")
         user = quote_plus(os.getenv("MYSQL_USER", "root"))
         password = quote_plus(os.getenv("MYSQL_PASSWORD", ""))
